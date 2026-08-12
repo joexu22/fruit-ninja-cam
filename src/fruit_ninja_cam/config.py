@@ -25,7 +25,8 @@ HAND_MIN_TRACKING_CONFIDENCE = 0.5
 
 # --- Gameplay ----------------------------------------------------------------
 STARTING_LIVES = 3
-GRAVITY = 1400.0  # px / s^2
+# Physics is scaled to the live frame size in game.py (not fixed 720p).
+GRAVITY = 1400.0  # px / s^2 at CAMERA_HEIGHT reference
 SPAWN_INTERVAL_START = 1.1  # seconds between spawns
 SPAWN_INTERVAL_MIN = 0.45
 SPAWN_INTERVAL_DECAY = 0.985  # multiply interval after each spawn
@@ -33,6 +34,11 @@ BOMB_SPAWN_CHANCE = 0.18
 FRUIT_RADIUS_MIN = 36
 FRUIT_RADIUS_MAX = 52
 BOMB_RADIUS = 40
+# Peak height as a fraction of frame height (0 = top). Fruit aims between these.
+FRUIT_APEX_Y_FRAC_MIN = 0.04
+FRUIT_APEX_Y_FRAC_MAX = 0.18
+FRUIT_LAUNCH_VX_SPREAD_FRAC = 0.22  # ± fraction of frame width
+# Kept for tests / fallback docs; live spawns use apex fractions above.
 FRUIT_LAUNCH_VY_MIN = -820.0
 FRUIT_LAUNCH_VY_MAX = -560.0
 FRUIT_LAUNCH_VX_SPREAD = 280.0

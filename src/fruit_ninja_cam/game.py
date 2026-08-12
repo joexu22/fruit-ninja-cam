@@ -99,17 +99,31 @@ class Game:
             self.spawn_interval * config.SPAWN_INTERVAL_DECAY,
         )
 
+    def _gravity(self) -> float:
+        """Scale gravity with frame height so arcs feel the same at any resolution."""
+        ref_h = float(config.CAMERA_HEIGHT) or 720.0
+        return config.GRAVITY * (float(self.height) / ref_h)
+
     def _make_projectile(self) -> Fruit:
         is_bomb = random.random() < config.BOMB_SPAWN_CHANCE
         x = random.uniform(self.width * 0.15, self.width * 0.85)
         y = float(self.height + 40)
-        vx = random.uniform(-config.FRUIT_LAUNCH_VX_SPREAD, config.FRUIT_LAUNCH_VX_SPREAD)
+        vx_spread = self.width * getattr(
+            config, "FRUIT_LAUNCH_VX_SPREAD_FRAC", 0.22
+        )
+        vx = random.uniform(-vx_spread, vx_spread)
         # Bias velocity toward center so fruit arcs into view.
         if x < self.width * 0.35:
             vx = abs(vx)
         elif x > self.width * 0.65:
             vx = -abs(vx)
-        vy = random.uniform(config.FRUIT_LAUNCH_VY_MIN, config.FRUIT_LAUNCH_VY_MAX)
+        # Launch speed from desired apex (near top), using v^2 = 2 * g * rise.
+        apex_lo = getattr(config, "FRUIT_APEX_Y_FRAC_MIN", 0.04)
+        apex_hi = getattr(config, "FRUIT_APEX_Y_FRAC_MAX", 0.18)
+        apex_y = self.height * random.uniform(apex_lo, apex_hi)
+        rise = max(80.0, y - apex_y)
+        g = self._gravity()
+        vy = -math.sqrt(2.0 * g * rise)
 
         if is_bomb:
             return Fruit(
@@ -134,7 +148,7 @@ class Game:
     def _integrate(self, dt: float) -> None:
         if dt <= 0:
             return
-        g = config.GRAVITY
+        g = self._gravity()
         for f in self.fruits:
             if not f.alive:
                 continue
