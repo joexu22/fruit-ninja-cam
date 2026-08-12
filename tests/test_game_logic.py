@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import time
 
+import pytest
+
 from fruit_ninja_cam.game import Game, GameState
 from fruit_ninja_cam.hand_tracker import TrailPoint
 from fruit_ninja_cam import config
@@ -108,6 +110,44 @@ def test_combo_bonus() -> None:
     # First slice: SLICE_SCORE; second within combo window: SLICE_SCORE + COMBO_BONUS
     assert game.score == config.SLICE_SCORE + (config.SLICE_SCORE + config.COMBO_BONUS)
     assert sum(1 for f in game.fruits if f.alive) == 0
+
+
+def test_slice_event_carries_geometry_for_effects() -> None:
+    game = Game(width=800, height=600)
+    game.start()
+    game.spawn_fruit_at(400, 300, radius=44, name="Orange", color_bgr=(24, 138, 252))
+
+    # Slash downward at 45 degrees through the fruit.
+    game.update(dt=0.016, trail=_fast_slash(340, 240, 460, 360))
+
+    ev = game.last_events[0]
+    assert ev.radius == 44
+    assert ev.color_bgr == (24, 138, 252)
+    assert ev.angle_deg == pytest.approx(45.0)
+    assert ev.combo == 1
+    assert not ev.is_bomb
+
+
+def test_bomb_emits_an_event_for_the_explosion() -> None:
+    game = Game(width=800, height=600)
+    game.start()
+    game.spawn_fruit_at(400, 300, radius=40, name="BOMB", is_bomb=True)
+    game.update(dt=0.016, trail=_fast_slash(360, 300, 440, 300))
+
+    assert len(game.last_events) == 1
+    assert game.last_events[0].is_bomb
+
+
+def test_combo_expires_after_the_window() -> None:
+    game = Game(width=800, height=600)
+    t0 = 1000.0
+    game.start(now=t0)
+    game.spawn_fruit_at(400, 300, radius=40)
+    game.update(dt=0.016, trail=_fast_slash(360, 300, 440, 300, t0), now=t0)
+    assert game.combo == 1
+
+    game.update(dt=0.016, trail=[], now=t0 + config.COMBO_WINDOW_SEC + 0.1)
+    assert game.combo == 0
 
 
 def test_start_resets_state() -> None:

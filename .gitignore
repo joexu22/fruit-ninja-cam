@@ -33,3 +33,6 @@ htmlcov/
 # Local env
 .env
 .env.*
+
+# Preview renders from scripts/render_preview.py
+preview/
