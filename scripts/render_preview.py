@@ -124,7 +124,8 @@ def simulate(out_dir: Path, seconds: float, video: bool, size: tuple[int, int]) 
 
     total = int(seconds * FPS)
     menu_frames = int(FPS * 1.6)
-    finale_at = total - int(FPS * 2.2)  # go bomb-hunting so the demo ends with a bang
+    # Go bomb-hunting near the end, leaving room for the explosion and end card.
+    finale_at = total - int(FPS * 4.0)
     now = 1000.0  # simulated clock; the game accepts any monotonic timebase
     pending: list[tuple[int, str]] = [(menu_frames // 2, "menu")]
     saved: set[str] = set()

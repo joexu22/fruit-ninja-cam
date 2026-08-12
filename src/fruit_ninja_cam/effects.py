@@ -27,6 +27,20 @@ def _glow(radius: int, color: BGR) -> np.ndarray:
     return gfx.radial_glow(radius, color)
 
 
+@lru_cache(maxsize=96)
+def _puff(radius: int, color: BGR) -> np.ndarray:
+    """Soft-edged smoke sprite — hard circles read as flat dark discs."""
+    size = max(3, radius * 2 + 1)
+    c = (size - 1) / 2.0
+    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
+    d = np.sqrt((xx - c) ** 2 + (yy - c) ** 2) / max(1.0, c)
+    alpha = np.clip(1.0 - d, 0.0, 1.0) ** 1.7 * 255.0
+    sprite = np.zeros((size, size, 4), np.uint8)
+    sprite[:, :, :3] = color
+    sprite[:, :, 3] = alpha.astype(np.uint8)
+    return sprite
+
+
 @dataclass
 class Half:
     """One flying piece of a sliced fruit."""
@@ -66,6 +80,7 @@ class Particle:
     drag: float = 0.86
     gravity: float = GRAVITY
     additive: bool = False
+    soft: bool = False
     shrink: float = 1.0
 
     def update(self, dt: float) -> None:
@@ -81,7 +96,10 @@ class Particle:
         t = min(1.0, self.age / self.ttl)
         fade = 1.0 - t * t
         r = max(1, int(self.radius * (1.0 - t * (1.0 - self.shrink))))
-        if self.additive:
+        if self.soft:
+            # Billow in fast, then thin out.
+            gfx.blit(frame, _puff(r, self.color), self.x, self.y, min(1.0, t / 0.12) * fade * 0.62)
+        elif self.additive:
             gfx.blit_add(frame, _glow(r * 2, self.color), self.x, self.y, fade)
         else:
             color = tuple(int(c * (0.45 + 0.55 * fade)) for c in self.color)
@@ -291,19 +309,38 @@ class Effects:
                     additive=True,
                 )
             )
-        for _ in range(22):
+        for _ in range(5):
             a = rng.uniform(0, 2 * math.pi)
-            speed = rng.uniform(30.0, 260.0)
             self._add(
                 Particle(
-                    x=x + rng.uniform(-r, r),
-                    y=y + rng.uniform(-r, r),
+                    x=x + math.cos(a) * r * 0.5,
+                    y=y + math.sin(a) * r * 0.5,
+                    vx=math.cos(a) * rng.uniform(60.0, 220.0),
+                    vy=math.sin(a) * rng.uniform(60.0, 220.0),
+                    radius=rng.uniform(r * 0.9, r * 1.5),
+                    color=(70, 170, 255),
+                    ttl=rng.uniform(0.16, 0.28),
+                    gravity=0.0,
+                    additive=True,
+                    shrink=1.4,
+                )
+            )
+        for _ in range(16):
+            a = rng.uniform(0, 2 * math.pi)
+            speed = rng.uniform(80.0, 320.0)
+            self._add(
+                Particle(
+                    x=x + rng.uniform(-r * 0.6, r * 0.6),
+                    y=y + rng.uniform(-r * 0.6, r * 0.6),
                     vx=math.cos(a) * speed,
-                    vy=math.sin(a) * speed - 60.0,
-                    radius=rng.uniform(r * 0.35, r * 0.85),
-                    color=(52, 48, 56),
-                    ttl=rng.uniform(0.6, 1.1),
-                    gravity=-120.0,
+                    vy=math.sin(a) * speed - 70.0,
+                    radius=rng.uniform(r * 0.5, r * 1.0),
+                    # Lit by the blast rather than flat black.
+                    color=rng.choice([(62, 58, 66), (86, 84, 92), (74, 78, 96)]),
+                    ttl=rng.uniform(0.7, 1.3),
+                    gravity=-150.0,
+                    drag=0.35,
+                    soft=True,
                     shrink=1.9,
                 )
             )
@@ -318,8 +355,11 @@ class Effects:
         self._flash_color = color
 
     def _add(self, particle: Particle) -> None:
-        if len(self.particles) < MAX_PARTICLES:
-            self.particles.append(particle)
+        # Evict the oldest rather than dropping the newest: the player must
+        # always get feedback for the slice they just made.
+        if len(self.particles) >= MAX_PARTICLES:
+            del self.particles[0]
+        self.particles.append(particle)
 
     # --- simulation ----------------------------------------------------------
 
