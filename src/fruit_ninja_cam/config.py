@@ -49,9 +49,24 @@ COMBO_WINDOW_SEC = 0.6
 COMBO_BONUS = 5
 
 FRUIT_TYPES: list[tuple[str, tuple[int, int, int]]] = [
-    ("Apple", (60, 60, 220)),      # BGR
-    ("Orange", (0, 140, 255)),
-    ("Banana", (0, 220, 240)),
-    ("Watermelon", (80, 180, 60)),
-    ("Grape", (180, 60, 160)),
+    ("Apple", (48, 46, 214)),      # BGR
+    ("Orange", (24, 138, 252)),
+    ("Banana", (72, 214, 244)),
+    ("Watermelon", (62, 148, 58)),
+    ("Grape", (156, 54, 138)),
+    ("Lemon", (52, 216, 246)),
 ]
+
+# --- Presentation ------------------------------------------------------------
+# The webcam feed is the backdrop, so it is pushed back (dimmed, desaturated,
+# vignetted) to keep the fruit and blade legible over any room lighting.
+BACKDROP_DIM = 0.34          # 0 = untouched feed, 1 = black
+BACKDROP_DESATURATE = 0.30   # 0 = full colour, 1 = greyscale
+VIGNETTE_STRENGTH = 0.55
+SHOW_FRUIT_LABELS = False    # sprites are readable without name tags
+FRUIT_SHADOW = True
+BLADE_GLOW = True
+BLADE_WIDTH = 15             # px at the tip, tapering to the trail's tail
+SCREEN_SHAKE = True
+HUD_ACCENT = (86, 196, 250)  # BGR amber
+HUD_DANGER = (72, 68, 255)

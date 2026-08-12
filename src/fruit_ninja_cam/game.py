@@ -34,12 +34,23 @@ class Fruit:
 
 @dataclass
 class SliceEvent:
-    """Record of a successful slice this frame (for VFX / scoring feedback)."""
+    """Record of a successful slice this frame (for VFX / scoring feedback).
+
+    Carries enough of the fruit's state for the renderer to spawn matching
+    halves and juice without reaching back into the (already dead) Fruit.
+    """
 
     x: float
     y: float
     name: str
     points: int
+    radius: float = 40.0
+    color_bgr: tuple[int, int, int] = (60, 60, 220)
+    vx: float = 0.0
+    vy: float = 0.0
+    angle_deg: float = 0.0  # blade direction at the moment of the cut
+    combo: int = 1
+    is_bomb: bool = False
 
 
 @dataclass
@@ -57,15 +68,19 @@ class Game:
     width: int = config.CAMERA_WIDTH
     height: int = config.CAMERA_HEIGHT
     last_events: list[SliceEvent] = field(default_factory=list)
+    # Bumped once per update() so renderers can tell a fresh batch of events
+    # from the same batch lingering after the game stopped updating.
+    event_epoch: int = 0
 
-    def start(self) -> None:
+    def start(self, now: float | None = None) -> None:
         """Begin a new run from menu or game-over."""
+        now = time.time() if now is None else now
         self.state = GameState.PLAYING
         self.score = 0
         self.lives = config.STARTING_LIVES
         self.fruits.clear()
         self.spawn_interval = config.SPAWN_INTERVAL_START
-        self._next_spawn_at = time.time() + 0.4
+        self._next_spawn_at = now + 0.4
         self._last_slice_at = 0.0
         self._combo = 0
         self.last_events.clear()
@@ -78,14 +93,17 @@ class Game:
     ) -> None:
         """Advance physics and resolve trail collisions. dt in seconds."""
         self.last_events.clear()
+        self.event_epoch += 1
         if self.state != GameState.PLAYING:
             return
 
         now = time.time() if now is None else now
         self._maybe_spawn(now)
         self._integrate(dt)
-        self._resolve_slices(trail)
+        self._resolve_slices(trail, now)
         self._cull_missed()
+        if now - self._last_slice_at > config.COMBO_WINDOW_SEC:
+            self._combo = 0
 
     # --- spawning ------------------------------------------------------------
 
@@ -158,18 +176,19 @@ class Game:
 
     # --- collision / scoring -------------------------------------------------
 
-    def _resolve_slices(self, trail: Sequence[TrailPoint]) -> None:
+    def _resolve_slices(self, trail: Sequence[TrailPoint], now: float) -> None:
         if len(trail) < 2:
             return
         for fruit in self.fruits:
             if not fruit.alive:
                 continue
-            if self._trail_hits_fruit(trail, fruit):
+            angle = self._trail_hits_fruit(trail, fruit)
+            if angle is not None:
                 fruit.alive = False
                 if fruit.is_bomb:
-                    self._on_bomb()
+                    self._on_bomb(fruit)
                     return
-                self._on_fruit_sliced(fruit)
+                self._on_fruit_sliced(fruit, angle, now)
 
     @staticmethod
     def _segment_circle_hit(
@@ -191,7 +210,10 @@ class Game:
         px, py = ax + t * abx, ay + t * aby
         return math.hypot(px - cx, py - cy) <= radius
 
-    def _trail_hits_fruit(self, trail: Sequence[TrailPoint], fruit: Fruit) -> bool:
+    def _trail_hits_fruit(
+        self, trail: Sequence[TrailPoint], fruit: Fruit
+    ) -> float | None:
+        """Return the blade angle (degrees) of the segment that cut, else None."""
         for i in range(1, len(trail)):
             a, b = trail[i - 1], trail[i]
             dt = b.t - a.t
@@ -204,11 +226,13 @@ class Game:
             if self._segment_circle_hit(
                 a.x, a.y, b.x, b.y, fruit.x, fruit.y, fruit.radius
             ):
-                return True
-        return False
+                return math.degrees(math.atan2(b.y - a.y, b.x - a.x))
+        return None
 
-    def _on_fruit_sliced(self, fruit: Fruit) -> None:
-        now = time.time()
+    def _on_fruit_sliced(
+        self, fruit: Fruit, angle_deg: float = 0.0, now: float | None = None
+    ) -> None:
+        now = time.time() if now is None else now
         if now - self._last_slice_at <= config.COMBO_WINDOW_SEC:
             self._combo += 1
         else:
@@ -217,11 +241,41 @@ class Game:
         points = config.SLICE_SCORE + max(0, self._combo - 1) * config.COMBO_BONUS
         self.score += points
         self.last_events.append(
-            SliceEvent(x=fruit.x, y=fruit.y, name=fruit.name, points=points)
+            SliceEvent(
+                x=fruit.x,
+                y=fruit.y,
+                name=fruit.name,
+                points=points,
+                radius=fruit.radius,
+                color_bgr=fruit.color_bgr,
+                vx=fruit.vx,
+                vy=fruit.vy,
+                angle_deg=angle_deg,
+                combo=self._combo,
+            )
         )
 
-    def _on_bomb(self) -> None:
+    @property
+    def combo(self) -> int:
+        """Current slice streak; drops to 0 once the combo window lapses."""
+        return self._combo
+
+    def _on_bomb(self, bomb: Fruit | None = None) -> None:
         self.state = GameState.GAME_OVER
+        if bomb is not None:
+            self.last_events.append(
+                SliceEvent(
+                    x=bomb.x,
+                    y=bomb.y,
+                    name=bomb.name,
+                    points=0,
+                    radius=bomb.radius,
+                    color_bgr=bomb.color_bgr,
+                    vx=bomb.vx,
+                    vy=bomb.vy,
+                    is_bomb=True,
+                )
+            )
         self.fruits = [f for f in self.fruits if f.alive]
 
     def _cull_missed(self) -> None:

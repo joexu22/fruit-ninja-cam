@@ -7,10 +7,10 @@ import time
 
 import cv2
 
-from fruit_ninja_cam import config
+from fruit_ninja_cam import config, theme
 from fruit_ninja_cam.game import Game, GameState
 from fruit_ninja_cam.hand_tracker import HandTracker
-from fruit_ninja_cam.render import draw_frame
+from fruit_ninja_cam.render import Renderer
 
 
 def main() -> int:
@@ -45,9 +45,15 @@ def main() -> int:
     print("Fruit Ninja Cam — SPACE start/restart, Q quit. Mirror on.")
     print("Slice fruit with your index fingertip. Avoid bombs!")
 
+    # Bake sprites up front so the first spawns don't hitch mid-swing.
+    theme.warm_sprites(
+        tuple(name for name, _ in config.FRUIT_TYPES),
+        range(config.FRUIT_RADIUS_MIN, config.FRUIT_RADIUS_MAX + 1),
+    )
+
     try:
         with HandTracker() as tracker:
-            return _run_loop(cap, game, tracker)
+            return _run_loop(cap, game, tracker, Renderer())
     except FileNotFoundError as exc:
         print(str(exc), file=sys.stderr)
         return 1
@@ -56,7 +62,9 @@ def main() -> int:
         cv2.destroyAllWindows()
 
 
-def _run_loop(cap: cv2.VideoCapture, game: Game, tracker: HandTracker) -> int:
+def _run_loop(
+    cap: cv2.VideoCapture, game: Game, tracker: HandTracker, renderer: Renderer
+) -> int:
     prev_t = time.time()
     # MediaPipe VIDEO mode requires monotonically increasing timestamps (ms).
     t0_ms = int(prev_t * 1000)
@@ -83,10 +91,11 @@ def _run_loop(cap: cv2.VideoCapture, game: Game, tracker: HandTracker) -> int:
         tip = tracker.process(frame, timestamp_ms)
         trail = tracker.trail
 
-        if game.state == GameState.PLAYING:
-            game.update(dt, trail, now=now)
+        # Called every frame: update() no-ops outside PLAYING but still retires
+        # the previous frame's slice events so effects fire exactly once.
+        game.update(dt, trail, now=now)
 
-        display = draw_frame(frame, game, trail, tip)
+        display = renderer.render(frame, game, trail, tip)
         cv2.imshow(config.WINDOW_NAME, display)
 
         key = cv2.waitKey(1) & 0xFF
@@ -95,6 +104,7 @@ def _run_loop(cap: cv2.VideoCapture, game: Game, tracker: HandTracker) -> int:
         if key == ord(" "):
             if game.state in (GameState.MENU, GameState.GAME_OVER):
                 tracker.clear_trail()
+                renderer.reset()
                 game.start()
 
     return 0
