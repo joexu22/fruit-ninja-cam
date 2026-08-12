@@ -231,9 +231,9 @@ class Effects:
                     y=y + rng.uniform(-r * 0.3, r * 0.3),
                     vx=math.cos(a) * speed,
                     vy=math.sin(a) * speed - rng.uniform(0.0, 160.0),
-                    radius=rng.uniform(3.0, r * 0.26),
+                    radius=rng.uniform(2.5, r * 0.19),
                     color=color,
-                    ttl=rng.uniform(0.45, 0.9),
+                    ttl=rng.uniform(0.4, 0.8),
                     shrink=0.3,
                 )
             )

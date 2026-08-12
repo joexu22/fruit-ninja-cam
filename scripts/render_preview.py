@@ -209,17 +209,57 @@ def art_sheet(out_dir: Path) -> None:
     print(f"wrote art sheet to {out_dir / 'art_sheet.png'}")
 
 
+def hero_shot(out_dir: Path, size: tuple[int, int]) -> None:
+    """A deliberately composed action frame for the README."""
+    w, h = size
+    backdrop = make_backdrop(w, h)
+    game = Game(width=w, height=h)
+    renderer = Renderer()
+    now = 1000.0
+    game.start(now)
+
+    for x, y, name, color, radius in (
+        (250, 330, "Watermelon", (62, 148, 58), 50),
+        (1010, 250, "Orange", (24, 138, 252), 44),
+        (760, 470, "Apple", (48, 46, 214), 46),
+    ):
+        fruit = game.spawn_fruit_at(x, y, radius=radius, name=name, color_bgr=color)
+        fruit.vx, fruit.vy = -80.0, -220.0
+    for x, y in ((430, 300), (620, 250)):
+        game.spawn_fruit_at(x, y, radius=46, name="Lemon", color_bgr=(52, 216, 246))
+    bomb = game.spawn_fruit_at(1080, 520, radius=40, name="BOMB", is_bomb=True)
+    bomb.vy = -260.0
+
+    trail = [TrailPoint(x=330.0 + i * 34, y=390.0 - i * 16, t=now + i * 0.008) for i in range(11)]
+    game.update(1 / 30, trail, now=now + 0.05)
+
+    frame = renderer.render(backdrop, game, trail, (trail[-1].x, trail[-1].y), dt=1 / 30)
+    for _ in range(5):
+        now += 1 / 30
+        game.update(1 / 30, [], now=now)
+        frame = renderer.render(backdrop, game, trail, (trail[-1].x, trail[-1].y), dt=1 / 30)
+
+    out_dir.mkdir(parents=True, exist_ok=True)
+    cv2.imwrite(str(out_dir / "hero.png"), frame)
+    print(f"wrote hero shot to {out_dir / 'hero.png'}")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--out", type=Path, default=Path("preview"))
     ap.add_argument("--seconds", type=float, default=12.0)
     ap.add_argument("--video", action="store_true", help="also write demo.mp4")
     ap.add_argument("--sheet", action="store_true", help="write an art contact sheet")
+    ap.add_argument("--hero", action="store_true", help="write a composed action still")
     ap.add_argument("--width", type=int, default=config.CAMERA_WIDTH)
     ap.add_argument("--height", type=int, default=config.CAMERA_HEIGHT)
     args = ap.parse_args()
     if args.sheet:
         art_sheet(args.out)
+    if args.hero:
+        hero_shot(args.out, (args.width, args.height))
+    if args.sheet or args.hero:
+        return 0
     simulate(args.out, args.seconds, args.video, (args.width, args.height))
     return 0
 

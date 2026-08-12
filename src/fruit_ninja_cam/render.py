@@ -126,10 +126,10 @@ class Renderer:
                 vy=ev.vy,
                 angle_deg=ev.angle_deg,
             )
-            self.effects.popup(ev.x, ev.y - ev.radius * 0.6, f"+{ev.points}", theme.GOLD, 0.9)
+            self.effects.popup(ev.x, ev.y - ev.radius * 0.5, f"+{ev.points}", theme.GOLD, 0.9)
             if ev.combo >= 2:
                 self.effects.popup(
-                    ev.x, ev.y - ev.radius * 1.35, f"COMBO x{ev.combo}", theme.MINT, 0.7
+                    ev.x, ev.y - ev.radius * 1.7, f"COMBO x{ev.combo}", theme.MINT, 0.7
                 )
 
     # --- backdrop ------------------------------------------------------------
@@ -424,14 +424,24 @@ _GLOWS: dict[tuple[int, tuple[int, int, int]], np.ndarray] = {}
 
 
 def _shadow_sprite(radius: int) -> np.ndarray:
-    """Soft dark halo that separates a fruit from a busy webcam backdrop."""
+    """Soft dark halo that separates a fruit from a busy webcam backdrop.
+
+    The falloff is analytic rather than a blurred disc: a blur wide enough to
+    look soft gets clipped by the sprite's bounds, which shows up as a dark
+    rectangle over light backgrounds.
+    """
     cached = _SHADOWS.get(radius)
     if cached is not None:
         return cached
-    size = int(radius * 2.9)
+    size = int(radius * 3.4) | 1
+    c = (size - 1) / 2.0
+    yy, xx = np.mgrid[0:size, 0:size].astype(np.float32)
+    d = np.sqrt((xx - c) ** 2 + (yy - c) ** 2) / max(1.0, float(radius))
+    alpha = np.clip((1.5 - d) / 0.55, 0.0, 1.0) ** 2 * 165.0
+
     sprite = np.zeros((size, size, 4), np.uint8)
-    cv2.circle(sprite, (size // 2, size // 2), int(radius * 1.02), (6, 4, 10, 190), -1, cv2.LINE_AA)
-    sprite = cv2.GaussianBlur(sprite, (0, 0), radius * 0.30)
+    sprite[:, :, :3] = (6, 4, 10)
+    sprite[:, :, 3] = alpha.astype(np.uint8)
     _SHADOWS[radius] = sprite
     return sprite
 

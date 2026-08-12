@@ -1,4 +1,4 @@
-.PHONY: setup run test download-models
+.PHONY: setup run test download-models preview
 
 setup:
 	python3 -m pip install -e ".[dev]"
@@ -12,3 +12,8 @@ run:
 
 test:
 	python3 -m pytest -q
+
+preview:
+	python3 scripts/render_preview.py --sheet
+	python3 scripts/render_preview.py --hero
+	python3 scripts/render_preview.py
