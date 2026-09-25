@@ -1,5 +1,9 @@
 # Fruit Ninja Cam
 
+### ▶ [Play it in your browser: fruit-ninja-cam-one.vercel.app](https://fruit-ninja-cam-one.vercel.app)
+
+Webcam or mouse/touch. Hand tracking runs on your device, and no video is uploaded.
+
 **Webcam Fruit Ninja** powered by [Google MediaPipe Hand Landmarker](https://developers.google.com/mediapipe/solutions/vision/hand_landmarker). Your **index fingertip** (landmark 8) is the blade — swipe to slice falling fruit, dodge bombs, keep 3 lives.
 
 Mac-first scaffold (OpenCV + MediaPipe Python Tasks). The same Hand Landmarker `.task` model runs on **Android / iOS / Web** via MediaPipe Tasks — this repo is a clean Python reference you can port.
@@ -22,6 +26,16 @@ Mac-first scaffold (OpenCV + MediaPipe Python Tasks). The same Hand Landmarker `
 - **SPACE** start / restart · **Q** (or Esc) quit
 - Model downloaded by script (not committed) — idempotent `scripts/download_models.py`
 - Unit-tested game logic (collision, scoring, bomb game-over, missed fruit) — no camera required
+
+## Browser version
+
+`web/` is a static port of the game: the same rules as `game.py`, MediaPipe Hand Landmarker running in the browser (Tasks Vision JS, GPU with a CPU fallback), and Canvas 2D rendering. There's no build step. To run it locally, serve the folder:
+
+```bash
+python3 -m http.server -d web 8000   # then open http://localhost:8000
+```
+
+It's deployed to Vercel from `web/` (`vercel deploy --prod` inside that folder).
 
 ## Quickstart (macOS)
 
